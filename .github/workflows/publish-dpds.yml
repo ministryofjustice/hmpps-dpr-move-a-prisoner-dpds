@@ -65,10 +65,10 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_NUMBER }}:role/dpr-dpd-s3-publisher-incident-reporting-${{ inputs.deployEnv }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_NUMBER }}:role/dpr-dpd-s3-publisher-move-a-prisoner-${{ inputs.deployEnv }}
           aws-region: eu-west-2
 
       - name: Upload DPDs
         run: |
           aws s3 sync definitions/ \
-            s3://dpr-data-product-definitions-${{ inputs.deployEnv }}/incident-reporting/
+            s3://dpr-data-product-definitions-${{ inputs.deployEnv }}/move-a-prisoner/

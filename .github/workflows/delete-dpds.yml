@@ -35,7 +35,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_NUMBER }}:role/dpr-dpd-s3-publisher-incident-reporting-${{ inputs.deployEnv }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_NUMBER }}:role/dpr-dpd-s3-publisher-move-a-prisoner-${{ inputs.deployEnv }}
           aws-region: eu-west-2
 
       - name: Delete DPDs
@@ -44,7 +44,7 @@ jobs:
           set -uo pipefail
 
           BUCKET="dpr-data-product-definitions-${{ inputs.deployEnv }}"
-          PREFIX="incident-reporting"
+          PREFIX="move-a-prisoner"
 
           IFS=',' read -ra FILES <<< "${{ inputs.fileNames }}"
 

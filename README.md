@@ -1,6 +1,6 @@
-# hmpps-dpr-incident-reporting-dpds
+# hmpps-dpr-move-a-prisoner-dpds
 
-Data Product Definitions for incident-reporting.
+Data Product Definitions for move-a-prisoner.
 
 DPD JSON files live under `definitions/` and are published to S3 by
 [`.github/workflows/publish-dpds.yml`](.github/workflows/publish-dpds.yml).
