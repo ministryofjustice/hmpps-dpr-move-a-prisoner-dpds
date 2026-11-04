@@ -70,5 +70,19 @@ jobs:
 
       - name: Upload DPDs
         run: |
+          # An experimental/ folder (at any level, e.g. definitions/property/experimental/)
+          # holds throwaway variants used to diagnose DPR-side problems. They are
+          # useful in the lower environments and must never reach production, so
+          # they are excluded there. In aws s3 sync patterns, * also matches "/".
+          EXCLUDE=()
+          if [ "${{ inputs.deployEnv }}" = "production" ]; then
+            EXCLUDE=(--exclude "experimental/*" --exclude "*/experimental/*")
+            echo "::notice::Production deploy - excluding every experimental/ folder"
+          fi
+
+          # Only DPD JSON files are published, so the .gitkeep files that hold empty
+          # service folders in place stay out of S3.
           aws s3 sync definitions/ \
-            s3://dpr-data-product-definitions-${{ inputs.deployEnv }}/move-a-prisoner/
+            s3://dpr-data-product-definitions-${{ inputs.deployEnv }}/move-a-prisoner/ \
+            --exclude "*" --include "*.json" \
+            "${EXCLUDE[@]}"
