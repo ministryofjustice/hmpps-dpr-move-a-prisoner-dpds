@@ -1,0 +1,201 @@
+{
+  "id": "sample-csra-current-levels",
+  "name": "Sample - current CSRA levels",
+  "description": "Sample report for developers. Lists the latest approved NOMIS CSRA for each person at a prison. Not for operational use.",
+  "metadata": {
+    "author": "Michael Willis",
+    "version": "1.0.0",
+    "owner": "Move a prisoner team",
+    "tags": [
+      "DPS",
+      "CSRA",
+      "Sample"
+    ]
+  },
+  "datasource": [
+    {
+      "id": "datamart",
+      "name": "datamart"
+    }
+  ],
+  "policy": [
+    {
+      "id": "access",
+      "type": "access",
+      "rule": [
+        {
+          "effect": "permit",
+          "condition": [
+            {
+              "match": [
+                "${role}",
+                "ROLE_PRISONS_REPORTING_USER"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "caseloads",
+      "type": "row-level",
+      "action": [
+        "prison_id IN (${caseloads})"
+      ],
+      "rule": [
+        {
+          "effect": "permit",
+          "condition": [
+            {
+              "exists": [
+                "${caseloads}"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "dataset": [
+    {
+      "id": "prisons",
+      "name": "Prisons",
+      "datasource": "datamart",
+      "query": "select prison_id, name prison_name FROM prisons.prisonregister_prison p where p.active = true order by name",
+      "schema": {
+        "field": [
+          {
+            "name": "prison_id",
+            "display": "Prison Id",
+            "type": "string"
+          },
+          {
+            "name": "prison_name",
+            "display": "Prison name",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "id": "sample-csra-current-levels",
+      "name": "Sample - current CSRA levels",
+      "datasource": "datamart",
+      "query": "WITH latest_csra AS (\n    SELECT oa.offender_book_id,\n           oa.assessment_date,\n           oa.next_review_date,\n           COALESCE(oa.review_sup_level_type, oa.overrided_sup_level_type, oa.calc_sup_level_type) AS csra_level,\n           ROW_NUMBER() OVER (\n               PARTITION BY oa.offender_book_id\n               ORDER BY oa.assessment_date DESC, oa.assessment_seq DESC) AS row_number\n    FROM prisons.nomis_offender_assessments oa\n    JOIN prisons.nomis_assessments a\n      ON a.assessment_id = oa.assessment_type_id\n     AND a.assessment_class = 'TYPE'\n     AND a.cell_sharing_alert_flag = 'Y'\n    WHERE oa.assess_status = 'A'\n)\nSELECT b.agy_loc_id AS prison_id,\n       o.offender_id_display AS prisoner_number,\n       o.last_name,\n       o.first_name,\n       c.csra_level,\n       CAST(c.assessment_date AS date) AS assessment_date,\n       CAST(c.next_review_date AS date) AS next_review_date\nFROM latest_csra c\nJOIN prisons.nomis_offender_bookings b\n  ON b.offender_book_id = c.offender_book_id\n AND b.booking_seq = 1\n AND b.active_flag = 'Y'\nJOIN prisons.nomis_offenders o ON o.offender_id = b.offender_id\nWHERE c.row_number = 1",
+      "schema": {
+        "field": [
+          {
+            "name": "prison_id",
+            "type": "string"
+          },
+          {
+            "name": "prisoner_number",
+            "type": "string"
+          },
+          {
+            "name": "last_name",
+            "type": "string"
+          },
+          {
+            "name": "first_name",
+            "type": "string"
+          },
+          {
+            "name": "csra_level",
+            "type": "string"
+          },
+          {
+            "name": "assessment_date",
+            "type": "date"
+          },
+          {
+            "name": "next_review_date",
+            "type": "date"
+          }
+        ]
+      }
+    }
+  ],
+  "report": [
+    {
+      "id": "sample-csra-current-levels",
+      "name": "Sample - current CSRA levels",
+      "description": "Sample report for developers. Lists the latest approved NOMIS CSRA for each person at a prison. Not for operational use.",
+      "version": "1.0.0",
+      "dataset": "$ref:sample-csra-current-levels",
+      "render": "HTML",
+      "feature": [
+        {
+          "type": "print"
+        }
+      ],
+      "specification": {
+        "template": "list",
+        "field": [
+          {
+            "name": "$ref:prison_id",
+            "display": "Prison",
+            "sortable": false,
+            "visible": "false",
+            "defaultsort": false,
+            "filter": {
+              "type": "multiselect",
+              "mandatory": true,
+              "dynamicoptions": {
+                "maximumOptions": 140,
+                "returnAsStaticOptions": true,
+                "dataset": "prisons",
+                "name": "prison_id",
+                "display": "prison_name"
+              }
+            }
+          },
+          {
+            "name": "$ref:prisoner_number",
+            "display": "NOMS number",
+            "sortable": true,
+            "visible": "true",
+            "defaultsort": false
+          },
+          {
+            "name": "$ref:last_name",
+            "display": "Last name",
+            "sortable": true,
+            "visible": "true",
+            "defaultsort": true
+          },
+          {
+            "name": "$ref:first_name",
+            "display": "First name",
+            "sortable": true,
+            "visible": "true",
+            "defaultsort": false
+          },
+          {
+            "name": "$ref:csra_level",
+            "display": "CSRA level",
+            "sortable": true,
+            "visible": "true",
+            "defaultsort": false
+          },
+          {
+            "name": "$ref:assessment_date",
+            "display": "Assessment date",
+            "sortable": true,
+            "visible": "true",
+            "defaultsort": false,
+            "formula": "format_date(${assessment_date}, 'dd/MM/yyyy')"
+          },
+          {
+            "name": "$ref:next_review_date",
+            "display": "Next review date",
+            "sortable": true,
+            "visible": "true",
+            "defaultsort": false,
+            "formula": "format_date(${next_review_date}, 'dd/MM/yyyy')"
+          }
+        ]
+      }
+    }
+  ]
+}
