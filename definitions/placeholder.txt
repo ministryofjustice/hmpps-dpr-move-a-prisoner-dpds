@@ -1,2 +1,0 @@
-This is a placeholder file to keep the definitions folder visible on git when it is empty.
-Please delete this file when there is at least one DPD JSON file in the folder.
