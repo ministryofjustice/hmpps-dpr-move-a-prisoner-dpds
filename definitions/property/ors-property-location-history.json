@@ -1,0 +1,244 @@
+{
+  "id": "ors-property-location-history",
+  "name": "ORS Property Location History",
+  "description": "The history of property stored at property locations at an establishment. Replaces ACC0023.",
+  "metadata": {
+    "author": "Michael Willis",
+    "version": "1.0.0",
+    "owner": "Move a prisoner team",
+    "tags": [
+      "DPS",
+      "Prisoner Property"
+    ]
+  },
+  "datasource": [
+    {
+      "id": "datamart",
+      "name": "datamart"
+    }
+  ],
+  "policy": [
+    {
+      "id": "access",
+      "type": "access",
+      "rule": [
+        {
+          "effect": "permit",
+          "condition": [
+            {
+              "exists": [
+                "${caseload}"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "caseloads",
+      "type": "row-level",
+      "action": [
+        "prison_id IN (${caseloads})"
+      ],
+      "rule": [
+        {
+          "effect": "permit",
+          "condition": [
+            {
+              "exists": [
+                "${caseloads}"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "dataset": [
+    {
+      "id": "prisons",
+      "name": "Prisons",
+      "datasource": "datamart",
+      "query": "select prison_id, name prison_name FROM prisons.prisonregister_prison p where p.active = true order by name",
+      "schema": {
+        "field": [
+          {
+            "name": "prison_id",
+            "display": "Prison Id",
+            "type": "string"
+          },
+          {
+            "name": "prison_name",
+            "display": "Prison name",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "id": "property-location-history",
+      "name": "Property Location History",
+      "datasource": "datamart",
+      "query": "WITH all_events AS (\n    SELECT e.id,\n           e.property_container_id,\n           e.event_type,\n           e.event_datetime,\n           e.to_internal_location_id,\n           e.to_storage_location_type,\n           LAST_VALUE(e.seal_number) IGNORE NULLS OVER (\n               PARTITION BY e.property_container_id\n               ORDER BY e.event_datetime, e.id\n               ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS seal_number,\n           LAST_VALUE(COALESCE(e.to_internal_location_id, e.to_storage_location_type)) IGNORE NULLS OVER (\n               PARTITION BY e.property_container_id\n               ORDER BY e.event_datetime, e.id\n               ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS last_known_location\n    FROM prisons.prisonerproperty_property_event e\n),\nlocation_changes AS (\n    SELECT id,\n           property_container_id,\n           event_datetime,\n           seal_number,\n           CASE WHEN event_type IN ('TRANSFERRED', 'RETURNED', 'DISPOSED', 'COMBINED', 'CREATED_IN_ERROR', 'REMOVED')\n                THEN NULL\n                ELSE last_known_location\n           END AS location_key\n    FROM all_events\n    WHERE to_internal_location_id IS NOT NULL\n       OR to_storage_location_type IS NOT NULL\n       OR event_type IN ('REACTIVATED', 'TRANSFERRED', 'RETURNED', 'DISPOSED', 'COMBINED', 'CREATED_IN_ERROR', 'REMOVED')\n),\nperiods AS (\n    SELECT property_container_id,\n           seal_number,\n           location_key,\n           event_datetime AS moved_in,\n           LEAD(event_datetime) OVER (\n               PARTITION BY property_container_id\n               ORDER BY event_datetime, id) AS moved_out\n    FROM location_changes\n),\nprisoner AS (\n    SELECT o.offender_id_display AS prisoner_number,\n           o.first_name,\n           o.last_name\n    FROM prisons.nomis_offenders o\n    JOIN prisons.nomis_offender_bookings b ON b.offender_id = o.offender_id\n    WHERE b.booking_seq = 1\n)\nSELECT c.prison_id,\n       CASE WHEN p.location_key = 'BRANSTON' THEN 'Branston' ELSE COALESCE(l.local_name, l.path_hierarchy, 'Unknown location') END AS location_name,\n       p.seal_number,\n       CASE c.container_type\n            WHEN 'STANDARD' THEN 'Standard'\n            WHEN 'EXCESS' THEN 'Excess'\n            WHEN 'VALUABLES' THEN 'Valuables'\n            WHEN 'CONFISCATED' THEN 'Confiscated'\n            ELSE c.container_type\n       END AS container_type,\n       CAST(p.moved_in AS date)  AS date_in,\n       CAST(p.moved_out AS date) AS date_out,\n       c.removal_date,\n       CASE WHEN c.removal_outcome IS NULL THEN 'Y' ELSE 'N' END AS active_flag,\n       c.prisoner_number,\n       INITCAP(n.first_name) AS first_name,\n       INITCAP(n.last_name) AS last_name\nFROM periods p\nJOIN prisons.prisonerproperty_property_container c ON c.id = p.property_container_id\nLEFT JOIN prisons.locationsinsideprison_location l ON l.id = p.location_key\nLEFT JOIN prisoner n ON n.prisoner_number = c.prisoner_number\nWHERE p.location_key IS NOT NULL\n  AND (p.moved_out IS NULL OR p.moved_out > p.moved_in)\n  AND COALESCE(c.removal_outcome, '') <> 'CREATED_IN_ERROR'",
+      "schema": {
+        "field": [
+          {
+            "name": "prison_id",
+            "type": "string"
+          },
+          {
+            "name": "location_name",
+            "type": "string"
+          },
+          {
+            "name": "seal_number",
+            "type": "string"
+          },
+          {
+            "name": "container_type",
+            "type": "string"
+          },
+          {
+            "name": "date_in",
+            "type": "date"
+          },
+          {
+            "name": "date_out",
+            "type": "date"
+          },
+          {
+            "name": "removal_date",
+            "type": "date"
+          },
+          {
+            "name": "active_flag",
+            "type": "string"
+          },
+          {
+            "name": "prisoner_number",
+            "type": "string"
+          },
+          {
+            "name": "first_name",
+            "type": "string"
+          },
+          {
+            "name": "last_name",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ],
+  "report": [
+    {
+      "id": "property-location-history",
+      "name": "Property Location History",
+      "description": "The history of property stored at property locations at an establishment. Replaces ACC0023.",
+      "version": "1.0.0",
+      "dataset": "$ref:property-location-history",
+      "render": "HTML",
+      "feature": [
+        {
+          "type": "print"
+        }
+      ],
+      "specification": {
+        "template": "list",
+        "field": [
+          {
+            "name": "$ref:prison_id",
+            "display": "Prison",
+            "sortable": false,
+            "visible": "false",
+            "defaultsort": false,
+            "filter": {
+              "type": "multiselect",
+              "mandatory": true,
+              "dynamicoptions": {
+                "maximumOptions": 140,
+                "returnAsStaticOptions": true,
+                "dataset": "prisons",
+                "name": "prison_id",
+                "display": "prison_name"
+              }
+            }
+          },
+          {
+            "name": "$ref:location_name",
+            "display": "Property location",
+            "sortable": true,
+            "visible": "true",
+            "defaultsort": true
+          },
+          {
+            "name": "$ref:seal_number",
+            "display": "Seal mark",
+            "sortable": true,
+            "visible": "true",
+            "defaultsort": false
+          },
+          {
+            "name": "$ref:container_type",
+            "display": "Type",
+            "sortable": true,
+            "visible": "true",
+            "defaultsort": false
+          },
+          {
+            "name": "$ref:date_in",
+            "display": "In location from",
+            "sortable": true,
+            "visible": "true",
+            "defaultsort": false,
+            "formula": "format_date(${date_in}, 'dd/MM/yyyy')"
+          },
+          {
+            "name": "$ref:date_out",
+            "display": "In location to",
+            "sortable": true,
+            "visible": "true",
+            "defaultsort": false,
+            "formula": "format_date(${date_out}, 'dd/MM/yyyy')"
+          },
+          {
+            "name": "$ref:removal_date",
+            "display": "Deactivation date",
+            "sortable": true,
+            "visible": "true",
+            "defaultsort": false,
+            "formula": "format_date(${removal_date}, 'dd/MM/yyyy')"
+          },
+          {
+            "name": "$ref:active_flag",
+            "display": "Active Y/N",
+            "sortable": true,
+            "visible": "true",
+            "defaultsort": false
+          },
+          {
+            "name": "$ref:prisoner_number",
+            "display": "Prisoner ID",
+            "sortable": true,
+            "visible": "true",
+            "defaultsort": false
+          },
+          {
+            "name": "$ref:first_name",
+            "display": "First name",
+            "sortable": true,
+            "visible": "true",
+            "defaultsort": false
+          },
+          {
+            "name": "$ref:last_name",
+            "display": "Last name",
+            "sortable": true,
+            "visible": "true",
+            "defaultsort": false
+          }
+        ]
+      }
+    }
+  ]
+}
