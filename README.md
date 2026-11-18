@@ -94,11 +94,19 @@ This validation is part of the [`.github/workflows/publish-dpds.yml`](.github/wo
 
 If you would like to also validate locally you could run:
 ```sh
-npm ci
+npm ci --ignore-scripts &&
+
 curl -fsSL \
-  https://raw.githubusercontent.com/ministryofjustice/hmpps-digital-prison-reporting-data-product-definitions-schema/main/schema/1.0.0/data-product-definition-schema.json \
-  -o schema.json
-SCHEMA_LOCATION=$PWD/schema.json npm run validate
+  "https://raw.githubusercontent.com/ministryofjustice/hmpps-digital-prison-reporting-data-product-definitions-schema/main/schema/1.1.0/data-product-definition-schema.json" \
+  -o schema1_1_0.json &&
+
+curl -fsSL \
+  "https://raw.githubusercontent.com/ministryofjustice/hmpps-digital-prison-reporting-data-product-definitions-schema/main/schema/1.0.0/data-product-definition-schema.json" \
+  -o schema1_0_0.json &&
+
+SCHEMA_1_1_0_LOCATION="$PWD/schema1_1_0.json" \
+SCHEMA_1_0_0_LOCATION="$PWD/schema1_0_0.json" \
+npm run validate
 ```
 
 ## Delete
